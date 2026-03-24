@@ -7,6 +7,7 @@ import {
 import {
   LoginDto,
   RegisterDto,
+  User,
   UserLoginResponseDto,
   UserRegisterResponseDto,
 } from "@carrent/shared";
@@ -18,6 +19,32 @@ export class UsersService {
 
   async sayHi() {
     return "Hi, i am USERS from users MS";
+  }
+
+  async getUsers(): Promise<User[]> {
+    try {
+      const allUsers = await this.prisma.user.findMany({
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+      return allUsers;
+    } catch (error) {
+      if (
+        error instanceof ConflictException ||
+        error instanceof UnauthorizedException ||
+        error instanceof InternalServerErrorException
+      ) {
+        throw error;
+      }
+
+      console.error("Unexpected error during getting users:", error);
+      throw new InternalServerErrorException("Getting users failed");
+    }
   }
 
   async register(registerDto: RegisterDto): Promise<UserRegisterResponseDto> {
