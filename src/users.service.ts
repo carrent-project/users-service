@@ -22,18 +22,31 @@ export class UsersService {
     return "Hi, i am USERS from users MS";
   }
 
-  async getUsers(): Promise<User[]> {
+  async getUsers(page: number = 1, limit: number = 10): Promise<any> {
     try {
-      const allUsers = await this.prisma.user.findMany({
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
-      return allUsers;
+      const skip = (page - 1) * limit;
+      const [users, total] = await this.prisma.$transaction([
+        this.prisma.user.findMany({
+          skip,
+          take: limit,
+          orderBy: { name: 'asc' },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
+        this.prisma.user.count(),
+      ]);
+      return {
+        data: users,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
     } catch (error) {
       if (
         error instanceof ConflictException ||
