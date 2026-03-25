@@ -3,6 +3,7 @@ import {
   Injectable,
   InternalServerErrorException,
   UnauthorizedException,
+  NotFoundException,
 } from "@nestjs/common";
 import {
   LoginDto,
@@ -33,6 +34,36 @@ export class UsersService {
         },
       });
       return allUsers;
+    } catch (error) {
+      if (
+        error instanceof ConflictException ||
+        error instanceof UnauthorizedException ||
+        error instanceof InternalServerErrorException
+      ) {
+        throw error;
+      }
+
+      console.error("Unexpected error during getting users:", error);
+      throw new InternalServerErrorException("Getting users failed");
+    }
+  }
+
+  async getUserById(id: string): Promise<User> {
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+      if (!user) {
+        throw new NotFoundException("User not found");
+      }
+      return user;
     } catch (error) {
       if (
         error instanceof ConflictException ||

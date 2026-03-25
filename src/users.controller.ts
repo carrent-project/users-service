@@ -50,4 +50,17 @@ export class UsersController {
       });
     }
   }
+
+  @MessagePattern("users.user-by-id")
+  async getUserById({ id }: { id: string }) {
+    try {
+      return await this.usersService.getUserById(id);
+    } catch (error) {
+      console.log("[Users Microservice] getUserById error:", error);
+      throw new RpcException({
+        statusCode: error.status || 500,
+        message: error.message || "Internal server error",
+      });
+    }
+  }
 }
