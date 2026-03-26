@@ -39,9 +39,9 @@ export class UsersController {
   }
 
   @MessagePattern("users.get-users")
-  async getUsers(@Payload() data: { page: number; limit: number }) {
+  async getUsers(@Payload() data: { search: string, page: number; limit: number }) {
     try {
-      return await this.usersService.getUsers(data.page, data.limit);
+      return await this.usersService.getUsers(data.search, data.page, data.limit);
     } catch (error) {
       console.log("[Users Microservice] getUsers error:", error);
       throw new RpcException({

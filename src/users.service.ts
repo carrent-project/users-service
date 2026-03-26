@@ -22,14 +22,18 @@ export class UsersService {
     return "Hi, i am USERS from users MS";
   }
 
-  async getUsers(page: number = 1, limit: number = 10): Promise<any> {
+  async getUsers(
+    search: string,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<any> {
     try {
       const skip = (page - 1) * limit;
       const [users, total] = await this.prisma.$transaction([
         this.prisma.user.findMany({
           skip,
           take: limit,
-          orderBy: { name: 'asc' },
+          orderBy: { name: "asc" },
           select: {
             id: true,
             email: true,
@@ -37,8 +41,21 @@ export class UsersService {
             createdAt: true,
             updatedAt: true,
           },
+          where: {
+            OR: [
+              { email: { contains: search, mode: "insensitive" } },
+              { name: { contains: search, mode: "insensitive" } },
+            ],
+          },
         }),
-        this.prisma.user.count(),
+        this.prisma.user.count({
+          where: {
+            email: {
+              contains: search,
+              mode: "insensitive",
+            },
+          },
+        }),
       ]);
       return {
         data: users,
