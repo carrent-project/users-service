@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import {
   LoginDto,
+  PaginatedUsersResponse,
   RegisterDto,
   User,
   UserLoginResponseDto,
@@ -26,7 +27,7 @@ export class UsersService {
     search: string,
     page: number = 1,
     limit: number = 10,
-  ): Promise<any> {
+  ): Promise<PaginatedUsersResponse> {
     try {
       const skip = (page - 1) * limit;
       const [users, total] = await this.prisma.$transaction([
@@ -40,6 +41,9 @@ export class UsersService {
             name: true,
             createdAt: true,
             updatedAt: true,
+            roles: {
+              include: { role: true },
+            },
           },
           where: {
             OR: [
@@ -50,15 +54,22 @@ export class UsersService {
         }),
         this.prisma.user.count({
           where: {
-            email: {
-              contains: search,
-              mode: "insensitive",
-            },
+            OR: [
+              { email: { contains: search, mode: "insensitive" } },
+              { name: { contains: search, mode: "insensitive" } },
+            ],
           },
         }),
       ]);
+      const usersWithRoleNamesAndDescriptions = users.map((user) => ({
+        ...user,
+        roles: user.roles.map((usr) => ({
+          roleName: usr.role.name,
+          roleDescription: usr.role.description,
+        })),
+      }));
       return {
-        data: users,
+        data: usersWithRoleNamesAndDescriptions,
         total,
         page,
         limit,
@@ -88,12 +99,21 @@ export class UsersService {
           name: true,
           createdAt: true,
           updatedAt: true,
+          roles: {
+            include: { role: true },
+          },
         },
       });
       if (!user) {
         throw new NotFoundException("User not found");
       }
-      return user;
+      return {
+        ...user,
+        roles: user.roles.map((usr) => ({
+          roleName: usr.role.name,
+          roleDescription: usr.role.description,
+        })),
+      };
     } catch (error) {
       if (
         error instanceof ConflictException ||
