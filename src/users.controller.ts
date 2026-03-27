@@ -63,4 +63,17 @@ export class UsersController {
       });
     }
   }
+
+  @MessagePattern("users.remove-user")
+  async removeUserById({ id }: { id: string }) {
+    try {
+      return await this.usersService.removeUserById(id);
+    } catch (error) {
+      console.log("[Users Microservice] removeUserById error:", error);
+      throw new RpcException({
+        statusCode: error.status || 500,
+        message: error.message || "Internal server error",
+      });
+    }
+  }
 }

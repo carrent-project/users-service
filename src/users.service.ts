@@ -190,4 +190,27 @@ export class UsersService {
       throw new InternalServerErrorException("Login failed");
     }
   }
+
+  async removeUserById(userId: string): Promise<string> {
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!user) {
+        throw new NotFoundException(`User: ${userId} is not found`);
+      }
+      await this.prisma.$transaction([
+        this.prisma.userRole.deleteMany({ where: { userId } }),
+        this.prisma.user.delete({ where: { id: userId } }),
+      ]);
+      return userId
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      console.error("Unexpected error during removing user:", error);
+      throw new InternalServerErrorException("Removing user failed");
+    }
+  }
 }
