@@ -146,6 +146,19 @@ export class UsersService {
         },
       });
 
+      const defaultRole = await this.prisma.role.findUnique({
+        where: { name: "user" },
+      });
+
+      if (defaultRole) {
+        await this.prisma.userRole.create({
+          data: {
+            userId: user.id,
+            roleId: defaultRole.id,
+          },
+        });
+      }
+
       return {
         id: user.id,
         email: user.email,
@@ -204,7 +217,7 @@ export class UsersService {
         this.prisma.userRole.deleteMany({ where: { userId } }),
         this.prisma.user.delete({ where: { id: userId } }),
       ]);
-      return userId
+      return userId;
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
