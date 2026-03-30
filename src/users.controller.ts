@@ -1,7 +1,7 @@
 import { Controller } from "@nestjs/common";
 import { MessagePattern, Payload, RpcException } from "@nestjs/microservices";
 import { UsersService } from "./users.service";
-import { LoginDto, RegisterDto } from "@carrent/shared";
+import { ICreateRoleDto, LoginDto, RegisterDto } from "@carrent/shared";
 
 @Controller()
 export class UsersController {
@@ -89,6 +89,20 @@ export class UsersController {
       return await this.usersService.getRoles();
     } catch (error) {
       console.log("[Users Microservice] getRoles error:", error);
+      throw new RpcException({
+        statusCode: error.status || 500,
+        message: error.message || "Internal server error",
+      });
+    }
+  }
+
+  @MessagePattern("roles.add")
+  async addRole(@Payload() data: ICreateRoleDto) {
+    try {
+      console.log("[Users Microservice] addRole called with:", data);
+      return await this.usersService.addRole(data);
+    } catch (error) {
+      console.log("[Users Microservice] login error:", error);
       throw new RpcException({
         statusCode: error.status || 500,
         message: error.message || "Internal server error",

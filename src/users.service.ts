@@ -6,6 +6,8 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import {
+  ICreateRoleDto,
+  ICreateRoleResponse,
   LoginDto,
   PaginatedUsersResponse,
   RegisterDto,
@@ -135,7 +137,7 @@ export class UsersService {
       });
 
       if (existingUser) {
-        throw new ConflictException("User with this email already exists");
+        throw new ConflictException(`User ${registerDto.email} already exists`);
       }
 
       const user = await this.prisma.user.create({
@@ -227,13 +229,41 @@ export class UsersService {
     }
   }
 
-  async getRoles(): Promise<{ id: number; name: string; description: string }[]> {
+  async getRoles(): Promise<
+    { id: number; name: string; description: string }[]
+  > {
     try {
-      const roles = await this.prisma.role.findMany()
-      return roles
+      const roles = await this.prisma.role.findMany();
+      return roles;
     } catch (error) {
       console.error("Unexpected error during getting roles:", error);
       throw new InternalServerErrorException("Getting roles failed");
+    }
+  }
+
+  async addRole(rolesDto: ICreateRoleDto): Promise<ICreateRoleResponse> {
+    try {
+      const existingRole = await this.prisma.role.findUnique({
+        where: { name: rolesDto.name },
+      });
+
+      if (existingRole) {
+        throw new ConflictException(`Role "${rolesDto.name}" already exists`);
+      }
+
+      const role = await this.prisma.role.create({
+        data: {
+          name: rolesDto.name,
+          description: rolesDto.description,
+        },
+      });
+      return {
+        name: role.name,
+        description: role.description,
+      };
+    } catch (error) {
+      console.error("Unexpected error during creating roles:", error);
+      throw new InternalServerErrorException("Creating roles failed");
     }
   }
 }
