@@ -262,8 +262,33 @@ export class UsersService {
         description: role.description,
       };
     } catch (error) {
+      if (error instanceof ConflictException) {
+        throw error;
+      }
       console.error("Unexpected error during creating roles:", error);
       throw new InternalServerErrorException("Creating roles failed");
+    }
+  }
+
+  async removeRoleByName(roleName: string): Promise<string> {
+    try {
+      if (roleName === 'user') {
+        throw new ConflictException(`Role "${roleName}" is default and cant be removed`);
+      }
+      const foundRole = await this.prisma.role.findUnique({
+        where: { name: roleName },
+      });
+      if (!foundRole) {
+        throw new NotFoundException(`Role "${roleName}" is not found`);
+      }
+      await this.prisma.$transaction([
+        this.prisma.userRole.deleteMany({ where: { roleId: foundRole.id } }),
+        this.prisma.role.delete({ where: { name: roleName } }),
+      ]);
+      return foundRole.name;
+    } catch (error) {
+      console.error("Unexpected error during removing roles:", error);
+      throw new InternalServerErrorException("Removing roles failed");
     }
   }
 }

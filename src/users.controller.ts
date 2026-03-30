@@ -109,4 +109,17 @@ export class UsersController {
       });
     }
   }
+
+  @MessagePattern("roles.remove")
+  async removeRoleByName({ roleName }: { roleName: string }) {
+    try {
+      return await this.usersService.removeRoleByName(roleName);
+    } catch (error) {
+      console.log("[Users Microservice] removeRoleByName error:", error);
+      throw new RpcException({
+        statusCode: error.status || 500,
+        message: error.message || "Internal server error",
+      });
+    }
+  }
 }
