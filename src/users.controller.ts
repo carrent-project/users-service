@@ -39,9 +39,15 @@ export class UsersController {
   }
 
   @MessagePattern("users.get-users")
-  async getUsers(@Payload() data: { search: string, page: number; limit: number }) {
+  async getUsers(
+    @Payload() data: { search: string; page: number; limit: number },
+  ) {
     try {
-      return await this.usersService.getUsers(data.search, data.page, data.limit);
+      return await this.usersService.getUsers(
+        data.search,
+        data.page,
+        data.limit,
+      );
     } catch (error) {
       console.log("[Users Microservice] getUsers error:", error);
       throw new RpcException({
@@ -70,6 +76,19 @@ export class UsersController {
       return await this.usersService.removeUserById(id);
     } catch (error) {
       console.log("[Users Microservice] removeUserById error:", error);
+      throw new RpcException({
+        statusCode: error.status || 500,
+        message: error.message || "Internal server error",
+      });
+    }
+  }
+
+  @MessagePattern("roles.list")
+  async getRoles() {
+    try {
+      return await this.usersService.getRoles();
+    } catch (error) {
+      console.log("[Users Microservice] getRoles error:", error);
       throw new RpcException({
         statusCode: error.status || 500,
         message: error.message || "Internal server error",

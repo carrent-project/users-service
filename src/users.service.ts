@@ -226,4 +226,14 @@ export class UsersService {
       throw new InternalServerErrorException("Removing user failed");
     }
   }
+
+  async getRoles(): Promise<{ id: number; name: string; description: string }[]> {
+    try {
+      const roles = await this.prisma.role.findMany()
+      return roles
+    } catch (error) {
+      console.error("Unexpected error during getting roles:", error);
+      throw new InternalServerErrorException("Getting roles failed");
+    }
+  }
 }
