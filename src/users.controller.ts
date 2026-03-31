@@ -1,7 +1,7 @@
 import { Controller } from "@nestjs/common";
 import { MessagePattern, Payload, RpcException } from "@nestjs/microservices";
 import { UsersService } from "./users.service";
-import { ICreateRoleDto, LoginDto, RegisterDto, UpdateUserDto } from "@carrent/shared";
+import { ICreateRoleDto, LoginDto, RegisterDto, UpdateUserDto, UpdateUserPasswordDto } from "@carrent/shared";
 
 @Controller()
 export class UsersController {
@@ -70,6 +70,19 @@ export class UsersController {
     }
   }
 
+  @MessagePattern("users.user-by-email")
+  async getUserByEmail({ email, withPassword }: { email: string, withPassword?: boolean }) {
+    try {
+      return await this.usersService.getUserByEmail(email, withPassword);
+    } catch (error) {
+      console.log("[Users Microservice] getUserByEmail error:", error);
+      throw new RpcException({
+        statusCode: error.status || 500,
+        message: error.message || "Internal server error",
+      });
+    }
+  }
+
   @MessagePattern("users.remove-user")
   async removeUserById({ id }: { id: string }) {
     try {
@@ -89,6 +102,19 @@ export class UsersController {
       return await this.usersService.updateUser(dto);
     } catch (error) {
       console.log("[Users Microservice] updateUser error:", error);
+      throw new RpcException({
+        statusCode: error.status || 500,
+        message: error.message || "Internal server error",
+      });
+    }
+  }
+
+  @MessagePattern("auth.change-password")
+  async updateUserPassword(dto: UpdateUserPasswordDto): Promise<string> {
+    try {
+      return await this.usersService.updateUserPassword(dto);
+    } catch (error) {
+      console.log("[Users Microservice] updateUserPassword error:", error);
       throw new RpcException({
         statusCode: error.status || 500,
         message: error.message || "Internal server error",

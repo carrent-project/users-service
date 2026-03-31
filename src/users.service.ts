@@ -12,6 +12,7 @@ import {
   PaginatedUsersResponse,
   RegisterDto,
   UpdateUserDto,
+  UpdateUserPasswordDto,
   User,
   UserLoginResponseDto,
   UserRegisterResponseDto,
@@ -128,6 +129,46 @@ export class UsersService {
 
       console.error("Unexpected error during getting users:", error);
       throw new InternalServerErrorException("Getting users failed");
+    }
+  }
+
+  async getUserByEmail(email: string, withPassword?: boolean): Promise<User> {
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { email },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          createdAt: true,
+          updatedAt: true,
+          password: withPassword,
+          roles: {
+            include: { role: true },
+          },
+        },
+      });
+      if (!user) {
+        throw new NotFoundException("User not found");
+      }
+      return {
+        ...user,
+        roles: user.roles.map((usr) => ({
+          roleName: usr.role.name,
+          roleDescription: usr.role.description,
+        })),
+      };
+    } catch (error) {
+      if (
+        error instanceof ConflictException ||
+        error instanceof UnauthorizedException ||
+        error instanceof InternalServerErrorException
+      ) {
+        throw error;
+      }
+
+      console.error("Unexpected error during getting user:", error);
+      throw new InternalServerErrorException("Getting user failed");
     }
   }
 
@@ -315,6 +356,34 @@ export class UsersService {
       ]);
       return foundRole.name;
     } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      console.error("Unexpected error during removing roles:", error);
+      throw new InternalServerErrorException("Removing roles failed");
+    }
+  }
+
+  async updateUserPassword(dto: UpdateUserPasswordDto): Promise<string> {
+    try {
+      const foundUser = await this.prisma.user.findUnique({
+        where: { email: dto.email },
+      });
+
+      if (!foundUser) {
+        throw new NotFoundException(`User "${dto.email}" is not found`);
+      }
+
+      const updatedUser = await this.prisma.user.update({
+        where: { email: dto.email },
+        data: { password: dto.newPassword },
+      });
+
+      return `Password for "${updatedUser.email}" changed successfully!`;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
       console.error("Unexpected error during removing roles:", error);
       throw new InternalServerErrorException("Removing roles failed");
     }
