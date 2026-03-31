@@ -11,6 +11,7 @@ import {
   LoginDto,
   PaginatedUsersResponse,
   RegisterDto,
+  UpdateUserDto,
   User,
   UserLoginResponseDto,
   UserRegisterResponseDto,
@@ -270,10 +271,37 @@ export class UsersService {
     }
   }
 
+  async updateUser(dto: UpdateUserDto): Promise<string> {
+    try {
+      const foundUser = await this.prisma.user.findUnique({
+        where: { email: dto.email },
+      });
+
+      if (!foundUser) {
+        throw new NotFoundException(`User ${dto.email} is not exists`);
+      }
+
+      const updatedUser = await this.prisma.user.update({
+        where: { email: dto.email },
+        data: { name: dto.name },
+      });
+
+      return updatedUser.id;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      console.error("Unexpected error during updating user:", error);
+      throw new InternalServerErrorException("Updating user failed");
+    }
+  }
+
   async removeRoleByName(roleName: string): Promise<string> {
     try {
-      if (roleName === 'user') {
-        throw new ConflictException(`Role "${roleName}" is default and cant be removed`);
+      if (roleName === "user") {
+        throw new ConflictException(
+          `Role "${roleName}" is default and cant be removed`,
+        );
       }
       const foundRole = await this.prisma.role.findUnique({
         where: { name: roleName },
