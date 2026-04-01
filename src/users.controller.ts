@@ -1,7 +1,7 @@
 import { Controller } from "@nestjs/common";
 import { MessagePattern, Payload, RpcException } from "@nestjs/microservices";
 import { UsersService } from "./users.service";
-import { ICreateRoleDto, LoginDto, RegisterDto, UpdateUserDto, UpdateUserPasswordDto } from "@carrent/shared";
+import { ICreateRoleDto, LoginDto, RegisterDto, UpdateUserDto, UpdateUserPasswordDto, UpdateUserRolesDto } from "@carrent/shared";
 
 @Controller()
 export class UsersController {
@@ -155,6 +155,19 @@ export class UsersController {
       return await this.usersService.removeRoleByName(roleName);
     } catch (error) {
       console.log("[Users Microservice] removeRoleByName error:", error);
+      throw new RpcException({
+        statusCode: error.status || 500,
+        message: error.message || "Internal server error",
+      });
+    }
+  }
+
+  @MessagePattern("auth.update-roles-list")
+  async updateUserRoles(@Payload() data: { dto: UpdateUserRolesDto; userId: string }) {
+    try {
+      return await this.usersService.updateUserRoles(data.dto, data.userId);
+    } catch (error) {
+      console.log("[Users Microservice] update user roles error:", error);
       throw new RpcException({
         statusCode: error.status || 500,
         message: error.message || "Internal server error",

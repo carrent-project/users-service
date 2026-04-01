@@ -4,6 +4,7 @@ import {
   InternalServerErrorException,
   UnauthorizedException,
   NotFoundException,
+  BadRequestException,
 } from "@nestjs/common";
 import {
   ICreateRoleDto,
@@ -13,6 +14,7 @@ import {
   RegisterDto,
   UpdateUserDto,
   UpdateUserPasswordDto,
+  UpdateUserRolesDto,
   User,
   UserLoginResponseDto,
   UserRegisterResponseDto,
@@ -386,6 +388,37 @@ export class UsersService {
       }
       console.error("Unexpected error during removing roles:", error);
       throw new InternalServerErrorException("Removing roles failed");
+    }
+  }
+
+  async updateUserRoles(dto: UpdateUserRolesDto, userId: string): Promise<{message: string}> {
+    try {
+      const allRoles = await this.getRoles();
+      const allRoleNames = allRoles.map(r => r.name);
+      const missingRoles = dto.roles.filter(role => !allRoleNames.includes(role));
+
+      if (missingRoles.length) {
+        throw new BadRequestException(`Roles not found: ${missingRoles.join(', ')}`);
+      }
+
+      const roleIds = allRoles
+        .filter(role => dto.roles.includes(role.name))
+        .map(role => role.id);
+
+      await this.prisma.$transaction([
+        this.prisma.userRole.deleteMany({ where: { userId } }),
+        this.prisma.userRole.createMany({
+          data: roleIds.map(roleId => ({ userId, roleId })),
+        }),
+      ]);
+
+      return { message: 'Roles updated successfully' };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      console.error("Unexpected error during updating users roles:", error);
+      throw new InternalServerErrorException("Updating users roles failed");
     }
   }
 }
