@@ -179,10 +179,29 @@ export class UsersService {
     try {
       const existingUser = await this.prisma.user.findUnique({
         where: { email: registerDto.email },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          password: true,
+          createdAt: true,
+          updatedAt: true,
+          roles: {
+            include: { role: true },
+          },
+        },
       });
 
       if (existingUser) {
         throw new ConflictException(`User ${registerDto.email} already exists`);
+      }
+
+      const defaultRole = await this.prisma.role.findUnique({
+        where: { name: "user" },
+      });
+
+      if (!defaultRole) {
+        throw new ConflictException(`Some troubles with roles`);
       }
 
       const user = await this.prisma.user.create({
@@ -191,10 +210,6 @@ export class UsersService {
           password: registerDto.password,
           name: registerDto.name,
         },
-      });
-
-      const defaultRole = await this.prisma.role.findUnique({
-        where: { name: "user" },
       });
 
       if (defaultRole) {
@@ -210,6 +225,7 @@ export class UsersService {
         id: user.id,
         email: user.email,
         name: user.name,
+        roles: [{ roleName: defaultRole?.name, roleDescription: defaultRole?.description }]
       };
     } catch (error) {
       if (
@@ -229,6 +245,17 @@ export class UsersService {
     try {
       const user = await this.prisma.user.findUnique({
         where: { email: loginDto.email },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          password: true,
+          createdAt: true,
+          updatedAt: true,
+          roles: {
+            include: { role: true },
+          },
+        },
       });
 
       if (!user) {
@@ -240,6 +267,10 @@ export class UsersService {
         email: user.email,
         name: user.name,
         password: user.password,
+        roles: user.roles.map((usr) => ({
+          roleName: usr.role.name,
+          roleDescription: usr.role.description,
+        })),
       };
     } catch (error) {
       if (error instanceof UnauthorizedException) {
@@ -315,11 +346,13 @@ export class UsersService {
     }
   }
 
-  async updateRoleByName(dto: UpdateRoleByNameDto): Promise<{message: string}> {
-    console.log('==> dto: ', dto)
+  async updateRoleByName(
+    dto: UpdateRoleByNameDto,
+  ): Promise<{ message: string }> {
+    console.log("==> dto: ", dto);
     try {
       const allRoles = await this.getRoles();
-      const isOldRoleExists = allRoles.map(r => r.name).includes(dto.oldRole)
+      const isOldRoleExists = allRoles.map((r) => r.name).includes(dto.oldRole);
       if (!isOldRoleExists) {
         throw new BadRequestException(`Role "${dto.oldRole} does not exists`);
       }
@@ -328,16 +361,18 @@ export class UsersService {
         return { message: `Role name unchanged` };
       }
 
-      if (dto.oldRole === 'user') {
+      if (dto.oldRole === "user") {
         throw new BadRequestException(`Cannot rename default role "user"`);
       }
 
       await this.prisma.role.update({
         where: { name: dto.oldRole },
-        data: { name: dto.newRole }
-      })
+        data: { name: dto.newRole },
+      });
 
-      return { message: `Role ${dto.oldRole} has been successfully updated to ${dto.newRole}` }
+      return {
+        message: `Role ${dto.oldRole} has been successfully updated to ${dto.newRole}`,
+      };
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
@@ -424,28 +459,35 @@ export class UsersService {
     }
   }
 
-  async updateUserRoles(dto: UpdateUserRolesDto, userId: string): Promise<{message: string}> {
+  async updateUserRoles(
+    dto: UpdateUserRolesDto,
+    userId: string,
+  ): Promise<{ message: string }> {
     try {
       const allRoles = await this.getRoles();
-      const allRoleNames = allRoles.map(r => r.name);
-      const missingRoles = dto.roles.filter(role => !allRoleNames.includes(role));
+      const allRoleNames = allRoles.map((r) => r.name);
+      const missingRoles = dto.roles.filter(
+        (role) => !allRoleNames.includes(role),
+      );
 
       if (missingRoles.length) {
-        throw new BadRequestException(`Roles not found: ${missingRoles.join(', ')}`);
+        throw new BadRequestException(
+          `Roles not found: ${missingRoles.join(", ")}`,
+        );
       }
 
       const roleIds = allRoles
-        .filter(role => dto.roles.includes(role.name))
-        .map(role => role.id);
+        .filter((role) => dto.roles.includes(role.name))
+        .map((role) => role.id);
 
       await this.prisma.$transaction([
         this.prisma.userRole.deleteMany({ where: { userId } }),
         this.prisma.userRole.createMany({
-          data: roleIds.map(roleId => ({ userId, roleId })),
+          data: roleIds.map((roleId) => ({ userId, roleId })),
         }),
       ]);
 
-      return { message: 'Roles updated successfully' };
+      return { message: "Roles updated successfully" };
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
