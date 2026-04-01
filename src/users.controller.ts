@@ -6,10 +6,6 @@ import { ICreateRoleDto, LoginDto, RegisterDto, UpdateRoleByNameDto, UpdateUserD
 @Controller()
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
-  @MessagePattern("users.list")
-  async sayHi() {
-    return await this.usersService.sayHi();
-  }
 
   @MessagePattern("users.login")
   async login(@Payload() data: LoginDto) {

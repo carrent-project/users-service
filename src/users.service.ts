@@ -26,10 +26,6 @@ import { PrismaService } from "./prisma.service";
 export class UsersService {
   constructor(private prisma: PrismaService) {}
 
-  async sayHi() {
-    return "Hi, i am USERS from users MS";
-  }
-
   async getUsers(
     search: string,
     page: number = 1,
@@ -46,6 +42,7 @@ export class UsersService {
             id: true,
             email: true,
             name: true,
+            phone: true,
             createdAt: true,
             updatedAt: true,
             roles: {
@@ -56,6 +53,7 @@ export class UsersService {
             OR: [
               { email: { contains: search, mode: "insensitive" } },
               { name: { contains: search, mode: "insensitive" } },
+              { phone: { contains: search, mode: "insensitive" } },
             ],
           },
         }),
@@ -104,6 +102,7 @@ export class UsersService {
           id: true,
           email: true,
           name: true,
+          phone: true,
           createdAt: true,
           updatedAt: true,
           roles: {
@@ -143,6 +142,7 @@ export class UsersService {
           id: true,
           email: true,
           name: true,
+          phone: true,
           createdAt: true,
           updatedAt: true,
           password: withPassword,
@@ -183,6 +183,7 @@ export class UsersService {
           id: true,
           email: true,
           name: true,
+          phone: true,
           password: true,
           createdAt: true,
           updatedAt: true,
@@ -209,6 +210,7 @@ export class UsersService {
           email: registerDto.email,
           password: registerDto.password,
           name: registerDto.name,
+          phone: registerDto.phone
         },
       });
 
@@ -225,6 +227,7 @@ export class UsersService {
         id: user.id,
         email: user.email,
         name: user.name,
+        phone: user.phone,
         roles: [{ roleName: defaultRole?.name, roleDescription: defaultRole?.description }]
       };
     } catch (error) {
@@ -250,6 +253,7 @@ export class UsersService {
           email: true,
           name: true,
           password: true,
+          phone: true,
           createdAt: true,
           updatedAt: true,
           roles: {
@@ -267,6 +271,7 @@ export class UsersService {
         email: user.email,
         name: user.name,
         password: user.password,
+        phone: user.phone,
         roles: user.roles.map((usr) => ({
           roleName: usr.role.name,
           roleDescription: usr.role.description,
@@ -349,7 +354,6 @@ export class UsersService {
   async updateRoleByName(
     dto: UpdateRoleByNameDto,
   ): Promise<{ message: string }> {
-    console.log("==> dto: ", dto);
     try {
       const allRoles = await this.getRoles();
       const isOldRoleExists = allRoles.map((r) => r.name).includes(dto.oldRole);
@@ -391,10 +395,9 @@ export class UsersService {
       if (!foundUser) {
         throw new NotFoundException(`User ${dto.email} is not exists`);
       }
-
       const updatedUser = await this.prisma.user.update({
         where: { email: dto.email },
-        data: { name: dto.name },
+        data: { name: dto.name, phone: dto.phone },
       });
 
       return updatedUser.id;
@@ -437,7 +440,7 @@ export class UsersService {
   async updateUserPassword(dto: UpdateUserPasswordDto): Promise<string> {
     try {
       const foundUser = await this.prisma.user.findUnique({
-        where: { email: dto.email },
+        where: { email: dto.email, phone: dto.phone },
       });
 
       if (!foundUser) {
