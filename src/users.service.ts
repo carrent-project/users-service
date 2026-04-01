@@ -12,6 +12,7 @@ import {
   LoginDto,
   PaginatedUsersResponse,
   RegisterDto,
+  UpdateRoleByNameDto,
   UpdateUserDto,
   UpdateUserPasswordDto,
   UpdateUserRolesDto,
@@ -307,6 +308,38 @@ export class UsersService {
       };
     } catch (error) {
       if (error instanceof ConflictException) {
+        throw error;
+      }
+      console.error("Unexpected error during creating roles:", error);
+      throw new InternalServerErrorException("Creating roles failed");
+    }
+  }
+
+  async updateRoleByName(dto: UpdateRoleByNameDto): Promise<{message: string}> {
+    console.log('==> dto: ', dto)
+    try {
+      const allRoles = await this.getRoles();
+      const isOldRoleExists = allRoles.map(r => r.name).includes(dto.oldRole)
+      if (!isOldRoleExists) {
+        throw new BadRequestException(`Role "${dto.oldRole} does not exists`);
+      }
+
+      if (dto.oldRole === dto.newRole) {
+        return { message: `Role name unchanged` };
+      }
+
+      if (dto.oldRole === 'user') {
+        throw new BadRequestException(`Cannot rename default role "user"`);
+      }
+
+      await this.prisma.role.update({
+        where: { name: dto.oldRole },
+        data: { name: dto.newRole }
+      })
+
+      return { message: `Role ${dto.oldRole} has been successfully updated to ${dto.newRole}` }
+    } catch (error) {
+      if (error instanceof BadRequestException) {
         throw error;
       }
       console.error("Unexpected error during creating roles:", error);
