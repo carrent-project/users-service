@@ -22,6 +22,24 @@ import {
 } from "@carrent/shared";
 import { PrismaService } from "./prisma.service";
 
+const errorsHandler = (status: 400 | 401 | 403 | 404 | 405 | 409 | 500, message?: string | null) => {
+  switch(status) {
+    case 400: {
+      throw new BadRequestException(message || 'Unhandled error');
+    }
+    case 401: {
+      throw new UnauthorizedException(message || 'Unhandled error');
+    }
+    case 409: {
+      throw new ConflictException(message || 'Unhandled error');
+    }
+    // ...и другие кейсы 
+    default: {
+      throw new InternalServerErrorException("Unknown status");
+    }
+  }
+}
+
 @Injectable()
 export class UsersService {
   constructor(private prisma: PrismaService) {}
@@ -177,8 +195,13 @@ export class UsersService {
 
   async register(registerDto: RegisterDto): Promise<UserRegisterResponseDto> {
     try {
-      const existingUser = await this.prisma.user.findUnique({
-        where: { email: registerDto.email },
+      const existingUser = await this.prisma.user.findFirst({
+        where: {
+          OR: [
+            { email: registerDto.email },
+            { phone: registerDto.phone },
+          ]
+        },
         select: {
           id: true,
           email: true,
@@ -193,8 +216,12 @@ export class UsersService {
         },
       });
 
-      if (existingUser) {
+      if (existingUser?.email === registerDto.email) {
         throw new ConflictException(`User ${registerDto.email} already exists`);
+      }
+
+      if (existingUser?.phone === registerDto.phone) {
+        throw new ConflictException(`User with phone ${registerDto.phone} already exists`);
       }
 
       const defaultRole = await this.prisma.role.findUnique({
@@ -231,11 +258,7 @@ export class UsersService {
         roles: [{ roleName: defaultRole?.name, roleDescription: defaultRole?.description }]
       };
     } catch (error) {
-      if (
-        error instanceof ConflictException ||
-        error instanceof UnauthorizedException ||
-        error instanceof InternalServerErrorException
-      ) {
+      if (error instanceof ConflictException) {
         throw error;
       }
 
