@@ -140,7 +140,7 @@ export class UsersService {
       };
     } catch (error) {
       if (
-        error instanceof ConflictException ||
+        error instanceof NotFoundException ||
         error instanceof UnauthorizedException ||
         error instanceof InternalServerErrorException
       ) {
