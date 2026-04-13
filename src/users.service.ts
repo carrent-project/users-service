@@ -1,11 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  InternalServerErrorException,
-  UnauthorizedException,
-  NotFoundException,
-  BadRequestException,
-} from "@nestjs/common";
+import { Injectable, HttpException } from "@nestjs/common";
 import {
   ICreateRoleDto,
   ICreateRoleResponse,
@@ -21,24 +14,7 @@ import {
   UserRegisterResponseDto,
 } from "@carrent/shared";
 import { PrismaService } from "./prisma.service";
-
-const errorsHandler = (status: 400 | 401 | 403 | 404 | 405 | 409 | 500, message?: string | null) => {
-  switch(status) {
-    case 400: {
-      throw new BadRequestException(message || 'Unhandled error');
-    }
-    case 401: {
-      throw new UnauthorizedException(message || 'Unhandled error');
-    }
-    case 409: {
-      throw new ConflictException(message || 'Unhandled error');
-    }
-    // ...и другие кейсы 
-    default: {
-      throw new InternalServerErrorException("Unknown status");
-    }
-  }
-}
+import { internalErrorHandler } from "./utils";
 
 @Injectable()
 export class UsersService {
@@ -80,6 +56,7 @@ export class UsersService {
             OR: [
               { email: { contains: search, mode: "insensitive" } },
               { name: { contains: search, mode: "insensitive" } },
+              { phone: { contains: search, mode: "insensitive" } },
             ],
           },
         }),
@@ -99,16 +76,12 @@ export class UsersService {
         totalPages: Math.ceil(total / limit),
       };
     } catch (error) {
-      if (
-        error instanceof ConflictException ||
-        error instanceof UnauthorizedException ||
-        error instanceof InternalServerErrorException
-      ) {
+      if (error instanceof HttpException) {
         throw error;
       }
 
       console.error("Unexpected error during getting users:", error);
-      throw new InternalServerErrorException("Getting users failed");
+      throw internalErrorHandler(500, "Getting users failed");
     }
   }
 
@@ -129,7 +102,7 @@ export class UsersService {
         },
       });
       if (!user) {
-        throw new NotFoundException("User not found");
+        throw internalErrorHandler(404, "User not found by id");
       }
       return {
         ...user,
@@ -139,16 +112,12 @@ export class UsersService {
         })),
       };
     } catch (error) {
-      if (
-        error instanceof NotFoundException ||
-        error instanceof UnauthorizedException ||
-        error instanceof InternalServerErrorException
-      ) {
+      if (error instanceof HttpException) {
         throw error;
       }
 
-      console.error("Unexpected error during getting users:", error);
-      throw new InternalServerErrorException("Getting users failed");
+      console.error("Unexpected error during getting users by id:", error);
+      throw internalErrorHandler(500, "Getting user by id failed");
     }
   }
 
@@ -170,7 +139,7 @@ export class UsersService {
         },
       });
       if (!user) {
-        throw new NotFoundException("User not found");
+        throw internalErrorHandler(404, "User not found by email");
       }
       return {
         ...user,
@@ -180,16 +149,11 @@ export class UsersService {
         })),
       };
     } catch (error) {
-      if (
-        error instanceof ConflictException ||
-        error instanceof UnauthorizedException ||
-        error instanceof InternalServerErrorException
-      ) {
+      if (error instanceof HttpException) {
         throw error;
       }
-
-      console.error("Unexpected error during getting user:", error);
-      throw new InternalServerErrorException("Getting user failed");
+      console.error("Unexpected error during getting by email user:", error);
+      throw internalErrorHandler(500, "Getting user by email failed");
     }
   }
 
@@ -197,10 +161,7 @@ export class UsersService {
     try {
       const existingUser = await this.prisma.user.findFirst({
         where: {
-          OR: [
-            { email: registerDto.email },
-            { phone: registerDto.phone },
-          ]
+          OR: [{ email: registerDto.email }, { phone: registerDto.phone }],
         },
         select: {
           id: true,
@@ -217,11 +178,11 @@ export class UsersService {
       });
 
       if (existingUser?.email === registerDto.email) {
-        throw new ConflictException(`User ${registerDto.email} already exists`);
+        throw internalErrorHandler(409, `User ${registerDto.email} already exists`);
       }
 
       if (existingUser?.phone === registerDto.phone) {
-        throw new ConflictException(`User with phone ${registerDto.phone} already exists`);
+        throw internalErrorHandler(409, `User with phone ${registerDto.phone} already exists`);
       }
 
       const defaultRole = await this.prisma.role.findUnique({
@@ -229,7 +190,7 @@ export class UsersService {
       });
 
       if (!defaultRole) {
-        throw new ConflictException(`Some troubles with roles`);
+        throw internalErrorHandler(409, "Some troubles with roles");
       }
 
       const user = await this.prisma.user.create({
@@ -237,7 +198,7 @@ export class UsersService {
           email: registerDto.email,
           password: registerDto.password,
           name: registerDto.name,
-          phone: registerDto.phone
+          phone: registerDto.phone,
         },
       });
 
@@ -255,15 +216,19 @@ export class UsersService {
         email: user.email,
         name: user.name,
         phone: user.phone,
-        roles: [{ roleName: defaultRole?.name, roleDescription: defaultRole?.description }]
+        roles: [
+          {
+            roleName: defaultRole?.name,
+            roleDescription: defaultRole?.description,
+          },
+        ],
       };
     } catch (error) {
-      if (error instanceof ConflictException) {
+      if (error instanceof HttpException) {
         throw error;
       }
-
       console.error("Unexpected error during registration:", error);
-      throw new InternalServerErrorException("Registration failed");
+      throw internalErrorHandler(500, "Registration failed");
     }
   }
 
@@ -286,7 +251,7 @@ export class UsersService {
       });
 
       if (!user) {
-        throw new UnauthorizedException("Invalid credentials");
+        throw internalErrorHandler(401, "Invalid credentials");
       }
 
       return {
@@ -301,12 +266,11 @@ export class UsersService {
         })),
       };
     } catch (error) {
-      if (error instanceof UnauthorizedException) {
+      if (error instanceof HttpException) {
         throw error;
       }
-
       console.error("Unexpected error during login:", error);
-      throw new InternalServerErrorException("Login failed");
+      throw internalErrorHandler(500, "Login failed");
     }
   }
 
@@ -317,7 +281,7 @@ export class UsersService {
       });
 
       if (!user) {
-        throw new NotFoundException(`User: ${userId} is not found`);
+        throw internalErrorHandler(404, `User: ${userId} is not found`);
       }
       await this.prisma.$transaction([
         this.prisma.userRole.deleteMany({ where: { userId } }),
@@ -325,11 +289,11 @@ export class UsersService {
       ]);
       return userId;
     } catch (error) {
-      if (error instanceof NotFoundException) {
+      if (error instanceof HttpException) {
         throw error;
       }
       console.error("Unexpected error during removing user:", error);
-      throw new InternalServerErrorException("Removing user failed");
+      throw internalErrorHandler(500, "Removing user failed");
     }
   }
 
@@ -340,8 +304,11 @@ export class UsersService {
       const roles = await this.prisma.role.findMany();
       return roles;
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
       console.error("Unexpected error during getting roles:", error);
-      throw new InternalServerErrorException("Getting roles failed");
+      throw internalErrorHandler(500, "Getting roles failed");
     }
   }
 
@@ -352,7 +319,7 @@ export class UsersService {
       });
 
       if (existingRole) {
-        throw new ConflictException(`Role "${rolesDto.name}" already exists`);
+        throw internalErrorHandler(409, `Role "${rolesDto.name}" already exists`);
       }
 
       const role = await this.prisma.role.create({
@@ -366,11 +333,11 @@ export class UsersService {
         description: role.description,
       };
     } catch (error) {
-      if (error instanceof ConflictException) {
+      if (error instanceof HttpException) {
         throw error;
       }
       console.error("Unexpected error during creating roles:", error);
-      throw new InternalServerErrorException("Creating roles failed");
+      throw internalErrorHandler(500, "Creating roles failed");
     }
   }
 
@@ -381,7 +348,7 @@ export class UsersService {
       const allRoles = await this.getRoles();
       const isOldRoleExists = allRoles.map((r) => r.name).includes(dto.oldRole);
       if (!isOldRoleExists) {
-        throw new BadRequestException(`Role "${dto.oldRole} does not exists`);
+        throw internalErrorHandler(400, `Role "${dto.oldRole} does not exists`);
       }
 
       if (dto.oldRole === dto.newRole) {
@@ -389,7 +356,7 @@ export class UsersService {
       }
 
       if (dto.oldRole === "user") {
-        throw new BadRequestException(`Cannot rename default role "user"`);
+        throw internalErrorHandler(400, `Cannot rename default role "user"`);
       }
 
       await this.prisma.role.update({
@@ -401,11 +368,11 @@ export class UsersService {
         message: `Role ${dto.oldRole} has been successfully updated to ${dto.newRole}`,
       };
     } catch (error) {
-      if (error instanceof BadRequestException) {
+      if (error instanceof HttpException) {
         throw error;
       }
-      console.error("Unexpected error during creating roles:", error);
-      throw new InternalServerErrorException("Creating roles failed");
+      console.error("Unexpected error during updating role by name:", error);
+      throw internalErrorHandler(500, "Updating role by name failed");
     }
   }
 
@@ -416,7 +383,7 @@ export class UsersService {
       });
 
       if (!foundUser) {
-        throw new NotFoundException(`User ${dto.email} is not exists`);
+        throw internalErrorHandler(404, `User ${dto.email} is not exists`);
       }
       const updatedUser = await this.prisma.user.update({
         where: { email: dto.email },
@@ -425,26 +392,24 @@ export class UsersService {
 
       return updatedUser.id;
     } catch (error) {
-      if (error instanceof NotFoundException) {
+      if (error instanceof HttpException) {
         throw error;
       }
       console.error("Unexpected error during updating user:", error);
-      throw new InternalServerErrorException("Updating user failed");
+      throw internalErrorHandler(500, "Updating user failed");
     }
   }
 
   async removeRoleByName(roleName: string): Promise<string> {
     try {
       if (roleName === "user") {
-        throw new ConflictException(
-          `Role "${roleName}" is default and cant be removed`,
-        );
+        throw internalErrorHandler(409, `Role "${roleName}" is default and cant be removed`);
       }
       const foundRole = await this.prisma.role.findUnique({
         where: { name: roleName },
       });
       if (!foundRole) {
-        throw new NotFoundException(`Role "${roleName}" is not found`);
+        throw internalErrorHandler(404, `Role "${roleName}" is not found`);
       }
       await this.prisma.$transaction([
         this.prisma.userRole.deleteMany({ where: { roleId: foundRole.id } }),
@@ -452,11 +417,11 @@ export class UsersService {
       ]);
       return foundRole.name;
     } catch (error) {
-      if (error instanceof NotFoundException) {
+      if (error instanceof HttpException) {
         throw error;
       }
-      console.error("Unexpected error during removing roles:", error);
-      throw new InternalServerErrorException("Removing roles failed");
+      console.error("Unexpected error during removing role by name:", error);
+      throw internalErrorHandler(500, "Removing role by name failed");
     }
   }
 
@@ -467,7 +432,7 @@ export class UsersService {
       });
 
       if (!foundUser) {
-        throw new NotFoundException(`User "${dto.email}" is not found`);
+        throw internalErrorHandler(404, `User "${dto.email}" is not found`);
       }
 
       const updatedUser = await this.prisma.user.update({
@@ -477,11 +442,11 @@ export class UsersService {
 
       return `Password for "${updatedUser.email}" changed successfully!`;
     } catch (error) {
-      if (error instanceof NotFoundException) {
+      if (error instanceof HttpException) {
         throw error;
       }
-      console.error("Unexpected error during removing roles:", error);
-      throw new InternalServerErrorException("Removing roles failed");
+      console.error("Unexpected error during updating user password:", error);
+      throw internalErrorHandler(500, "Updating user password failed");
     }
   }
 
@@ -497,9 +462,7 @@ export class UsersService {
       );
 
       if (missingRoles.length) {
-        throw new BadRequestException(
-          `Roles not found: ${missingRoles.join(", ")}`,
-        );
+        throw internalErrorHandler(400, `Roles not found: ${missingRoles.join(", ")}`);
       }
 
       const roleIds = allRoles
@@ -515,11 +478,11 @@ export class UsersService {
 
       return { message: "Roles updated successfully" };
     } catch (error) {
-      if (error instanceof BadRequestException) {
+      if (error instanceof HttpException) {
         throw error;
       }
       console.error("Unexpected error during updating users roles:", error);
-      throw new InternalServerErrorException("Updating users roles failed");
+      throw internalErrorHandler(500, "Updating users roles failed");
     }
   }
 }

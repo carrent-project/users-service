@@ -171,7 +171,7 @@ export class UsersController {
     }
   }
 
-  @MessagePattern("auth.update-roles-list")
+  @MessagePattern("roles.update-roles-list")
   async updateUserRoles(@Payload() data: { dto: UpdateUserRolesDto; userId: string }) {
     try {
       return await this.usersService.updateUserRoles(data.dto, data.userId);
