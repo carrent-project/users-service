@@ -102,7 +102,7 @@ export class UsersService {
         },
       });
       if (!user) {
-        throw internalErrorHandler(404, "User not found by id");
+        throw internalErrorHandler(404, "User is not found by id");
       }
       return {
         ...user,
