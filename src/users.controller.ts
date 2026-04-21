@@ -10,7 +10,6 @@ export class UsersController {
   @MessagePattern("users.login")
   async login(@Payload() data: LoginDto) {
     try {
-      console.log("[Users Microservice] login called with:", data);
       return await this.usersService.login(data);
     } catch (error) {
       console.log("[Users Microservice] login error:", error);
